@@ -1,0 +1,389 @@
+{
+  "name": "Automated Price Tracker",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -976,
+        -432
+      ],
+      "id": "6d321c08-c69a-411f-82fa-c6f51c67363b",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "1aPB2hdZJrHUeVEb_H1LbRVzqMBy89ZNuARhHZVxXGeo",
+          "mode": "list",
+          "cachedResultName": "n8nPriceList",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aPB2hdZJrHUeVEb_H1LbRVzqMBy89ZNuARhHZVxXGeo/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "ProductList",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -752,
+        -432
+      ],
+      "id": "d8f010ab-2365-4b56-be0e-55821bd82466",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleApi": {
+          "id": "3A0dgcQnHdnLLywe",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.3"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "en-US,en;q=0.9,tr;q=0.8"
+            },
+            {
+              "name": "Upgrade-Insecure-Requests",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -528,
+        -432
+      ],
+      "id": "864cdf82-4bcb-428c-9b27-276c998a31fb",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "price_preferred",
+              "cssSelector": ".a-price .a-offscreen"
+            },
+            {
+              "key": "price_fallback",
+              "cssSelector": ".a-price"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        -304,
+        -432
+      ],
+      "id": "8126306f-fa76-42c7-b07f-53246025c1ef",
+      "name": "HTML"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.item.json;\n\nlet rawPrice = item.price_preferred || item.price_fallback || item.fiyat_raw;\n\nif (!rawPrice) {\n  return { json: { error: \"Price not found. Check selectors.\", ...item } };\n}\n\n\nif (typeof rawPrice === 'object') {\n    rawPrice = JSON.stringify(rawPrice);\n}\n\n\n\nlet cleanPrice = rawPrice.toString().replace(/\\r?\\n|\\r/g, '').replace(/\\s+/g, '');\n\nlet currency = \"TL\"; // Default fallback\nif (cleanPrice.includes('$') || cleanPrice.includes('USD')) currency = \"$\";\nelse if (cleanPrice.includes('€') || cleanPrice.includes('EUR')) currency = \"€\";\nelse if (cleanPrice.includes('£') || cleanPrice.includes('GBP')) currency = \"£\";\n\nif (cleanPrice.includes('$') || cleanPrice.includes('€') || cleanPrice.includes('USD')) {\n    cleanPrice = cleanPrice.replace(/[^\\d.]/g, '');\n} else {\n    cleanPrice = cleanPrice\n        .replace(/\\./g, '')      \n        .replace(',', '.')       \n        .replace(/[^\\d.]/g, ''); \n}\n\nconst currentPrice = parseFloat(cleanPrice);\nconst targetPrice = parseFloat( $('Get row(s) in sheet').item.json.TargetPrice );\nconst lastPrice = parseFloat( $('Get row(s) in sheet').item.json.LastPrice );\n\nconst isDiscount = currentPrice < lastPrice && currentPrice > 0;\nconst isPriceIncrease = currentPrice > lastPrice && lastPrice > 0;  \nconst isTargetHit = currentPrice <= targetPrice && currentPrice > 0;\n\nlet alertReason = \"\";\nif (isTargetHit) {\n    alertReason = \"Target Price Hit!\";\n} else if (isDiscount) {\n    alertReason = \"Discount Alert!\";\n} else if (isPriceIncrease) {\n    alertReason = \"Price Increased!\";\n}\n\n\nconst isAlert = isDiscount || isTargetHit || isPriceIncrease;\n\nreturn {\n  json: {\n    ...item,\n    currentPrice: currentPrice,\n    currency: currency,\n    isAlert: isAlert,\n    alertReason: alertReason || \"No Change\"\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        -432
+      ],
+      "id": "8895014c-bf98-4b2a-a2b2-679cff3947e0",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "35d7169d-f1de-4c12-9e30-1cb6b31828d8",
+              "leftValue": "={{ $json.isAlert }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        144,
+        -432
+      ],
+      "id": "569fce05-7e74-4c01-b680-0392a7e4c847",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "sendTo": "..@gmail.com",
+        "subject": "=🚨 PRICE ALARM - {{ $('Get row(s) in sheet').item.json.Product }}",
+        "emailType": "text",
+        "message": "=\n\n💰 Current price: {{ $json.currentPrice }} \n📉 Old price: {{ $('Get row(s) in sheet').item.json.LastPrice }}\n⚠️ Durum: {{ $json.alertReason }}\n\n🔗 Link: {{ $('Get row(s) in sheet').item.json.URL }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        368,
+        -496
+      ],
+      "id": "6182975d-8697-404a-a2c5-35ac9081d786",
+      "name": "Send a message",
+      "webhookId": "29a23b32-86ad-4fca-bd5c-4d17a06f5cd5",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Mjn37SqYiRmsHqFu",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1aPB2hdZJrHUeVEb_H1LbRVzqMBy89ZNuARhHZVxXGeo",
+          "mode": "list",
+          "cachedResultName": "n8nPriceList",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aPB2hdZJrHUeVEb_H1LbRVzqMBy89ZNuARhHZVxXGeo/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "ProductList",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aPB2hdZJrHUeVEb_H1LbRVzqMBy89ZNuARhHZVxXGeo/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Product": "={{ $('Get row(s) in sheet').item.json.Product }}",
+            "LastPrice": "={{ $('Code in JavaScript').item.json.currentPrice }}{{ $('Code in JavaScript').item.json.currency }}"
+          },
+          "matchingColumns": [
+            "Product"
+          ],
+          "schema": [
+            {
+              "id": "Product",
+              "displayName": "Product",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "URL",
+              "displayName": "URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "LastPrice",
+              "displayName": "LastPrice",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "TargetPrice",
+              "displayName": "TargetPrice",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        592,
+        -432
+      ],
+      "id": "91221905-afe6-490e-94a1-5ce082d4b2e2",
+      "name": "Update row in sheet",
+      "credentials": {
+        "googleApi": {
+          "id": "3A0dgcQnHdnLLywe",
+          "name": "Google Service Account account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionTimeout": 600
+  },
+  "versionId": "754a3940-cfbc-4fc2-8cf6-2a8aef82178a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7849105553fd1304c92b5067696e9c8e1ee17ac7c43c48f70b574509af7f5f05"
+  },
+  "id": "yMgNJuTvQraAl4C4",
+  "tags": []
+}

@@ -1,0 +1,198 @@
+{
+  "name": "Automated Gold Financial Analyst",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://api.collectapi.com/economy/goldPrice",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "authorization",
+              "value": "apikey ..."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -608,
+        -288
+      ],
+      "id": "4fb3fc6d-0046-4d75-9c8c-a9fe0bf5168d",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "claude-haiku-4-5-20251001"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a financial analyst specializing in Gold markets. \nAnalyze the current market data below and provide a very short commentary (1 sentence) about the trend.\n\nCurrent Data:\n- Gram Gold Price: {{ $json.selling }} TL\n- Daily Change Rate: {{ $json.rate }}%\n- ONS Gold Price: {{ $json.ons_selling }} USD\n\nPlease provide your response ONLY in the following JSON format:\n{\n  \"trend\": \"Upward 📈\" or \"Downward 📉\" or \"Stable ➖\",\n  \"comment\": \"A single sentence commentary in Turkish explaining if this is a significant move based on the rate.\"\n}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        -288
+      ],
+      "id": "eaf577c0-2c22-4d5b-abd4-9b1256a09c63",
+      "name": "Message a model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "4DBDvOHtys5mShqJ",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "..@gmail.com",
+        "subject": "=📉 Günlük Altın Yorumu: {{ $json.trend }}",
+        "message": "=<div style=\"font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd;\">\n  <h2 style=\"color: #d4af37;\">📢 Günlük Altın Analizi</h2>\n\n  <p style=\"font-size: 16px;\">\n    <b>Gram Altın:</b> {{ $('GetGoldPrice').item.json.selling }} TL (%{{ $('GetGoldPrice').item.json.rate }})<br>\n    <b>ONS Altın:</b> {{ $('GetGoldPrice').item.json.ons_selling }} USD\n  </p>\n\n  <div style=\"background-color: #f0f4f8; padding: 15px; border-radius: 8px; margin-top: 15px;\">\n    <strong style=\"color: #2c3e50;\">🤖 Yapay Zeka Yorumu:</strong>\n    <p style=\"margin-top: 5px; font-style: italic;\">\n      \"{{ $json.comment }}\"\n    </p>\n  </div>\n\n  <p style=\"font-size: 12px; color: #999; margin-top: 20px;\">\n    Trend Yönü: {{ $json.trend }}\n  </p>\n</div>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        -288
+      ],
+      "id": "4ea82ec7-ce51-4c39-9ea1-1adecb097e9a",
+      "name": "Send a message",
+      "webhookId": "fc18c833-a879-4bb1-a409-ad553dadd8e7",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Mjn37SqYiRmsHqFu",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "path": "gold",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -832,
+        -288
+      ],
+      "id": "4b3a50ca-2e46-47c1-b256-2355db0cfd13",
+      "name": "Webhook",
+      "webhookId": "8d5db159-6c2c-48a5-a1bf-c2086f845e9e"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.item.json;\n\nlet rawText = null;\n\nif (item.content && Array.isArray(item.content)) {\n  rawText = item.content\n    .map(c => c.text)\n    .filter(Boolean)\n    .join('\\n');\n}\n\nif (!rawText) {\n  return {\n    json: {\n      error: \"Text not found\",\n      debug: item\n    }\n  };\n}\n\nconst cleanText = rawText\n  .replace(/```json/g, '')\n  .replace(/```/g, '')\n  .trim();\n\n\nlet parsed;\ntry {\n  parsed = JSON.parse(cleanText);\n} catch (e) {\n  parsed = {\n    trend: \"Unknown\",\n    comment: cleanText\n  };\n}\n\nreturn {\n  json: {\n    trend: parsed.trend ?? \"Unknown\",\n    comment: parsed.comment ?? \"\",\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        -288
+      ],
+      "id": "666055b1-2110-408b-ad6d-c8b812eaad69",
+      "name": "GetMessage"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst golds = $input.item.json.result;\n\nconst gramGold = golds.find(item => item.name === 'Gram Altın');\nconst onsGold = golds.find(item => item.name === 'ONS Altın');\n\nreturn {\n  json: {\n    name: gramGold.name,\n    buying: gramGold.buying,\n    selling: gramGold.selling,\n    rate: gramGold.rate, \n    time: gramGold.time,\n    ons_selling: onsGold.selling\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        -288
+      ],
+      "id": "0adf6e9e-abbf-43c2-8b0a-5172f611d659",
+      "name": "GetGoldPrice"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "GetGoldPrice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "GetMessage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetMessage": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetGoldPrice": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "94d30539-530c-4af7-8ff9-d2448a63c6d3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7849105553fd1304c92b5067696e9c8e1ee17ac7c43c48f70b574509af7f5f05"
+  },
+  "id": "ZtqXRPm4Zg2tB9fN",
+  "tags": []
+}
