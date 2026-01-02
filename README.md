@@ -16,6 +16,12 @@ An automated shopping assistant that:
 *   Compares current price with target price and history.
 *   Sends email alerts for discounts or when targets are hit.
 
+### 3. [Github Trend Hunter](./github-trend-hunter) 🏹
+A weekly newsletter generator that:
+*   Finds trending GitHub repositories.
+*   Summarizes them using AI.
+*   Sends a formatted email report.
+
 ## 🛠️ Setup
 
 To use these workflows:
