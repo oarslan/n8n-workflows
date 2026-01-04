@@ -22,6 +22,12 @@ A weekly newsletter generator that:
 *   Summarizes them using AI.
 *   Sends a formatted email report.
 
+### 4. [Pgvector Rag Agent](./pgvector-rag-agent) 🤖
+A RAG (Retrieval-Augmented Generation) agent that:
+*   Uses **PostgreSQL (pgvector)** as a vector database.
+*   Uses **Google Gemini** for embeddings and chat.
+*   Performs semantic search on documents and answers questions in natural language.
+
 ## 🛠️ Setup
 
 To use these workflows:
